@@ -16,6 +16,7 @@ import { Decor } from './decor.js';
 import { FloorPlanStore } from './floorplan.js';
 import { Docs } from './docs.js';
 import { Dog } from './dog.js';
+import { Feeds } from './feeds/index.js';
 import { Court } from './court.js';
 import { Jail } from './jail.js';
 import { Garage } from './garage.js';
@@ -129,6 +130,8 @@ export class Floor {
   /** Settles once the workers whose terminals outlived the last office are picked back up, and the rest woken. */
   readonly ready: Promise<void>;
   readonly dog: Dog;
+  /** Boards fed from elsewhere instead of GitHub (see feeds/index.ts). */
+  readonly feeds: Feeds;
   /** The basketball by the hoop: who has it, or how it was last thrown. */
   readonly court = new Court();
   /** The cars in the garage: who's in which, and where their drivers have left them. */
@@ -165,6 +168,11 @@ export class Floor {
       send: (dog) => ctx.emit(this, { t: 'dog', dog }),
       wing: () => this.plan.wing,
     });
+    this.feeds = new Feeds(def.dir, dataDir, {
+      send: (feeds) => ctx.emit(this, { t: 'feeds', feeds }),
+      workers: () => this.workers?.list() ?? [],
+      watched: () => ctx.people(this) > 0,
+    });
 
     this.workers = new WorkerManager(
       def.dir,
@@ -179,6 +187,7 @@ export class Floor {
           this.queue?.onWorker(worker);
           this.meetings?.onWorker(worker);
           this.dog.onWorker(worker);
+          this.feeds.onWorker();
           ctx.workerChanged(this, worker);
           // Its turn ended, or whoever had its terminal open closed it: it may be free to go now.
           this.sendLandedHome();
@@ -193,6 +202,7 @@ export class Floor {
           this.queue?.onWorkerGone(workerId);
           this.meetings?.onWorkerGone(workerId);
           this.dog.onWorkerGone(workerId);
+          this.feeds.onWorkerGone(info);
           ctx.workerChanged(this, workerId);
         },
         data: (workerId, data, viewers) => ctx.termData(workerId, data, viewers),
@@ -413,6 +423,7 @@ export class Floor {
     clearInterval(this.timer);
     clearTimeout(this.landedTimer);
     this.dog.stop();
+    this.feeds.stop();
     this.github.stop();
     this.queue.shutdown();
     this.meetings.shutdown();
