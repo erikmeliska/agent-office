@@ -62,3 +62,47 @@ agent-office tunnel [office@address | url] [--port <n>] [--office-port <n>] [--n
   the worker stops it. Given an SSH address it opens the tunnel to the office too.
   See docs/tunnel.md.
 ```
+
+## Feed boards
+
+A floor can swap its issues board, its PR board or both for a board of its own with an `agent-office.boards.json` in the root of its checkout, committed with the project (not in `.agent-office/`, which belongs to the office). Without the file, the floor keeps its GitHub boards. The office reads it when it opens the floor, which is when the office starts, so restart the office after you change it.
+
+```json
+{
+  "boards": {
+    "issues": {
+      "type": "mcp",
+      "title": "🔥 Hot",
+      "mcp": { "url": "https://support.example.com/api/mcp", "tokenEnv": "SUPPORT_MCP_TOKEN" },
+      "refreshSec": 120,
+      "columns": [
+        { "title": "Critical", "tool": "get_tasks", "args": { "priority": "critical" },
+          "item": { "id": "#{id}", "title": "{title}", "sub": "{assigned_to_name}" }, "tone": "hot", "limit": 8 },
+        { "title": "Overdue", "tool": "get_tasks", "where": { "deadline": "<now" }, "sort": "deadline",
+          "item": { "id": "#{id}", "title": "{title}", "sub": "{assigned_to_name}" }, "tone": "warn", "limit": 8 },
+        { "title": "Tickets waiting on us", "tool": "search_tickets", "args": { "status": "waiting_on_us" },
+          "sort": "last_client_message_at",
+          "item": { "id": "T{id}", "title": "{subject}", "sub": "{assigned_agent_name}" }, "tone": "warn", "limit": 8 }
+      ]
+    },
+    "pulls": { "type": "activity", "title": "🤖 Agents" }
+  }
+}
+```
+
+- **Boards.** `boards` has at most two keys, `issues` and `pulls`, the board each one takes the place of. Each has a `type`, `mcp` or `activity`, and a `title` the board shows.
+- **`mcp`** asks an MCP server's tools over Streamable HTTP and shows what they return. It reads only: the board calls the tools you name and nothing else.
+  - `mcp.url`: the server, over `https` (plain `http` only to `localhost`, `127.0.0.1` or `[::1]`).
+  - `mcp.tokenEnv`: the name of an environment variable of the office's own (`SUPPORT_MCP_TOKEN=… agent-office`) that holds the token, sent as `Authorization: Bearer <token>`. The token is read from the office's environment and never reaches the browser; only the fields the item templates name do. Without the variable the board makes no call and says which variable is missing.
+  - `refreshSec`: how often it loads, in whole seconds, at least 30 (default 120). A floor nobody is on loads five times less often.
+  - `columns`: 1 to 4 of them.
+- **A column** calls one tool, which must answer with text holding a JSON array of rows, within 15 seconds.
+  - `title` and `tool`, the column's heading and the tool it calls; `args`, an object sent to the tool as it is.
+  - `item`: how a row is shown, as templates with `{field}` for a row's fields: `id` and `title` are required, `sub` (the small line under it) is optional.
+  - `where` (optional): `field → condition`, all of them must hold. A condition is a value the field must equal (a string, number, `true`/`false` or `null`), or `"<now"` / `">now"` for a date (`YYYY-MM-DD` or `YYYY-MM-DD HH:MM[:SS]`) before or after now; a row without a date there is left out.
+  - `sort` (optional): a field to order by, `-field` for descending; rows without it go last either way.
+  - `limit`: how many rows the column shows, 1 to 20 (default 8). **E** at the board opens the whole list.
+  - `tone` (optional): `hot`, `warn` or `ok`, the color its cards get.
+- **`activity`** shows the floor's agents instead: **Now**, the workers at their desks with what they're on (waiting for you is `hot`, working `warn`, done or idle `ok`), and **Recent**, the last 30 who went home with what they had been on, kept in the floor's `.agent-office/activity.json`. Board agents aren't on it. `now` and `recent` rename the two columns, e.g. `{ "type": "activity", "title": "🤖 Agents", "now": "Busy", "recent": "Gone home" }`.
+
+When a board can't load (no token, the server refused it, a timeout, an answer that isn't a JSON array), it says why and keeps showing what it last loaded, with the time it did. One column failing leaves the others as they are. A file that isn't valid opens the floor anyway, with the reason on the board and in the office's log.
