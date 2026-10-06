@@ -10,6 +10,7 @@ import type { JukeboxState } from '../jukebox.js';
 import type { WhiteboardView } from '../whiteboard.js';
 import type { AgentProvider } from './agents.js';
 import type { BoardFeed } from './feeds.js';
+import type { AppScreenState } from './appscreen.js';
 import type { GhIssue, GhPull, GhState } from './github.js';
 import type { MeetingState } from './meetings.js';
 import type { PeerInfo } from './presence.js';
@@ -125,6 +126,8 @@ export interface FloorView {
   jail: JailState;
   /** Boards this floor's checkout replaces with a feed of its own (agent-office.boards.json); empty for most floors. */
   feeds: BoardFeed[];
+  /** The app on the meeting room's screen: the same on every floor. */
+  appScreen: AppScreenState;
 }
 
 export type FloorClientMsg =
