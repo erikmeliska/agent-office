@@ -43,7 +43,7 @@ const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 export const TOKEN_ENV_PREFIX = 'AGENT_OFFICE_MCP_';
 const TOKEN_ENV = new RegExp(`^${TOKEN_ENV_PREFIX}[A-Z0-9_]+$`);
 // Private-network addresses written straight into the URL; loopback stays allowed for a local MCP server.
-// (A name that resolves to one is the MCP client's to catch, not the config's.)
+// (A name that resolves to one is the MCP client's to catch, not the config's: it checks with isPrivateIp too.)
 const PRIVATE = new BlockList();
 for (const [net, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]] as const) {
   PRIVATE.addSubnet(net, bits, 'ipv4');
@@ -52,7 +52,8 @@ for (const [net, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], 
 for (const [net, bits] of [['fc00::', 7], ['fe80::', 10], ['::', 128]] as const) PRIVATE.addSubnet(net, bits, 'ipv6');
 const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
 
-function isPrivateIp(hostname: string): boolean {
+/** Whether `hostname` is an IP literal (brackets allowed) in a private range. Loopback is not. */
+export function isPrivateIp(hostname: string): boolean {
   const ip = hostname.replace(/^\[|\]$/g, '');
   const family = isIP(ip);
   return family !== 0 && PRIVATE.check(ip, family === 4 ? 'ipv4' : 'ipv6');
