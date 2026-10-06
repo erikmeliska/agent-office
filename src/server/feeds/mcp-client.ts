@@ -1,7 +1,10 @@
 // Just enough of an MCP client (Streamable HTTP) for a feed board: initialize once per session, then
 // tools/call. Answers come as JSON or as server-sent events; a tool's answer is text holding a JSON list.
 import { lookup as dnsLookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
+import type { LookupAddress } from 'node:dns';
 import type { Row } from './columns.js';
 import { isPrivateIp } from './config.js';
 
@@ -101,31 +104,57 @@ export class McpHttpClient implements McpCaller {
     }
   }
 
-  /** config.ts refused private IP literals in the URL; a name has to be resolved before each request. */
-  private async checkHost() {
-    const host = new URL(this.url).hostname.replace(/^\[|\]$/g, '');
-    if (isIP(host)) return;
-    const addrs = await this.resolve(host);
-    if (addrs.some((a) => isPrivateIp(a.address))) throw new McpError('mcp.url resolves into a private network');
-  }
-
-  private async post(body: object, token: string) {
-    await this.checkHost();
-    const res = await fetch(this.url, {
-      method: 'POST',
-      // A redirect could lead into the private network, so none is followed.
-      redirect: 'manual',
-      signal: AbortSignal.timeout(this.timeoutMs),
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json, text/event-stream',
-        authorization: `Bearer ${token}`,
-        'mcp-protocol-version': PROTOCOL,
-        ...(this.session ? { 'mcp-session-id': this.session } : {}),
+  /**
+   * The connection's own DNS lookup, refusing a name with any address in a private network. The
+   * address checked is the one connected to, so a name can't be re-pointed between check and request.
+   * (config.ts already refused IP literals in the URL, and those never come through here.)
+   */
+  private lookup: LookupFunction = (hostname, options, cb) => {
+    this.resolve(hostname).then(
+      (addrs) => {
+        if (addrs.some((a) => isPrivateIp(a.address))) return cb(new McpError('mcp.url resolves into a private network'), '', 0);
+        const all = addrs.map((a) => ({ address: a.address, family: isIP(a.address) }));
+        if (!all.length) return cb(Object.assign(new Error(`no address for ${hostname}`), { code: 'ENOTFOUND' }), '', 0);
+        if (options.all) return (cb as unknown as (e: null, a: LookupAddress[]) => void)(null, all);
+        cb(null, all[0].address, all[0].family);
       },
-      body: JSON.stringify(body),
+      (e: NodeJS.ErrnoException) => cb(e, '', 0),
+    );
+  };
+
+  private post(body: object, token: string): Promise<{ status: number; header: (name: string) => string | undefined; text: string }> {
+    const data = JSON.stringify(body);
+    const send = new URL(this.url).protocol === 'https:' ? httpsRequest : httpRequest;
+    return new Promise((resolve, reject) => {
+      // node:http follows no redirects, and agent: false gives each request a fresh connection, looked up anew.
+      const req = send(this.url, {
+        method: 'POST',
+        agent: false,
+        lookup: this.lookup,
+        signal: AbortSignal.timeout(this.timeoutMs),
+        headers: {
+          'content-type': 'application/json',
+          'content-length': Buffer.byteLength(data),
+          accept: 'application/json, text/event-stream',
+          authorization: `Bearer ${token}`,
+          'mcp-protocol-version': PROTOCOL,
+          ...(this.session ? { 'mcp-session-id': this.session } : {}),
+        },
+      }, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('error', reject);
+        res.on('end', () => {
+          const header = (name: string) => {
+            const v = res.headers[name.toLowerCase()];
+            return Array.isArray(v) ? v.join(', ') : v;
+          };
+          resolve({ status: res.statusCode ?? 0, header, text: Buffer.concat(chunks).toString('utf8') });
+        });
+      });
+      req.on('error', reject);
+      req.end(data);
     });
-    return { status: res.status, headers: res.headers, text: await res.text() };
   }
 
   private async rpc(method: string, params: object, token: string): Promise<unknown> {
@@ -146,9 +175,9 @@ export class McpHttpClient implements McpCaller {
     }
     if (r.status >= 300 && r.status < 400) throw new McpError(`redirected (HTTP ${r.status}), not followed`);
     if (r.status < 200 || r.status >= 300) throw new McpError(`HTTP ${r.status}`);
-    const sid = r.headers.get('mcp-session-id');
+    const sid = r.header('mcp-session-id');
     if (sid) this.session = sid;
-    const msg = parseRpcBody(r.text, r.headers.get('content-type') ?? '', id);
+    const msg = parseRpcBody(r.text, r.header('content-type') ?? '', id);
     if (msg.error) throw new McpError(`error ${msg.error.code}: ${msg.error.message}`);
     return msg.result;
   }

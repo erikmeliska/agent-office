@@ -134,6 +134,26 @@ test('a name that resolves to loopback is allowed; an IP literal is not looked u
   assert.ok(asked.length > 0 && asked.every((h) => h === 'localhost'));
 });
 
+test('the address checked is the one connected to, so re-pointing the name is caught', async (t) => {
+  const mcp = await fakeMcp(standard([{ id: 1 }]));
+  t.after(mcp.close);
+  // A rebinding DNS server: a harmless address at first, a private one afterwards.
+  let answer = '127.0.0.1';
+  const asked: string[] = [];
+  const resolve = async (host: string) => {
+    asked.push(host);
+    return [{ address: answer }];
+  };
+  const client = new McpHttpClient(mcp.url.replace('127.0.0.1', 'rebind.example.com'), () => 't', 'T', { resolve });
+  // The name reaches the fake server only through the resolver's answer, never through system DNS.
+  assert.deepEqual((await client.call('x', {})).rows, [{ id: 1 }]);
+  const before = mcp.seen.length;
+  assert.equal(asked.length, before, 'every request looks the name up again');
+  answer = '10.0.0.1';
+  await assert.rejects(client.call('x', {}), /mcp\.url resolves into a private network/);
+  assert.equal(mcp.seen.length, before);
+});
+
 test('parseRpcBody: JSON, SSE, wrong id, garbage', () => {
   assert.deepEqual(parseRpcBody('{"jsonrpc":"2.0","id":3,"result":1}', 'application/json', 3), { jsonrpc: '2.0', id: 3, result: 1 });
   assert.deepEqual(parseRpcBody('data: {"id":2,"result":0}\n\ndata: {"id":3,"result":5}\n', 'text/event-stream; charset=utf-8', 3), { id: 3, result: 5 });
