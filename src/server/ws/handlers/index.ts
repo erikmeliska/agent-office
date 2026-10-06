@@ -8,6 +8,7 @@ import { carHandlers, carHooks, carsView } from './car.js';
 import { changesHandlers, changesHooks } from './changes.js';
 import { decorHandlers, decorView } from './decor.js';
 import { dogHandlers, dogView } from './dog.js';
+import { feedsView } from './feeds.js';
 import { floorHandlers, projectView } from './floors.js';
 import { githubHandlers, issuesView, pullsView } from './github.js';
 import { jukeboxHandlers, jukeboxView } from './jukebox.js';
@@ -73,4 +74,5 @@ export const views: ViewPieces = {
   whiteboard: whiteboardView,
   meeting: meetingView,
   cabinet: cabinetView,
+  feeds: feedsView,
 };
