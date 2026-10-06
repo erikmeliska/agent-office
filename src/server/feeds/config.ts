@@ -38,7 +38,8 @@ export interface LoadedConfig {
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const TONES = new Set<string>(['hot', 'warn', 'ok']);
-const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+/** The URL host names that may use plain http, and the only ones the MCP client lets reach loopback. */
+export const LOOPBACK: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
 /** The file is committed with the project, so it may only name tokens the office set aside for boards. */
 export const TOKEN_ENV_PREFIX = 'AGENT_OFFICE_MCP_';
 const TOKEN_ENV = new RegExp(`^${TOKEN_ENV_PREFIX}[A-Z0-9_]+$`);
@@ -50,6 +51,9 @@ for (const [net, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], 
 }
 // BlockList already holds IPv4-mapped IPv6 (::ffff:10.0.0.1) to the IPv4 rules.
 for (const [net, bits] of [['fc00::', 7], ['fe80::', 10], ['::', 128]] as const) PRIVATE.addSubnet(net, bits, 'ipv6');
+const LOOPBACK_IPS = new BlockList();
+LOOPBACK_IPS.addSubnet('127.0.0.0', 8, 'ipv4');
+LOOPBACK_IPS.addAddress('::1', 'ipv6');
 const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
 
 /** Whether `hostname` is an IP literal (brackets allowed) in a private range. Loopback is not. */
@@ -57,6 +61,12 @@ export function isPrivateIp(hostname: string): boolean {
   const ip = hostname.replace(/^\[|\]$/g, '');
   const family = isIP(ip);
   return family !== 0 && PRIVATE.check(ip, family === 4 ? 'ipv4' : 'ipv6');
+}
+
+/** Whether `address` (an IP) is loopback: 127.0.0.0/8, ::1 or an IPv4-mapped ::ffff:127.x. */
+export function isLoopbackIp(address: string): boolean {
+  const family = isIP(address);
+  return family !== 0 && LOOPBACK_IPS.check(address, family === 4 ? 'ipv4' : 'ipv6');
 }
 
 export function urlProblem(raw: string): string | undefined {
