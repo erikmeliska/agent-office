@@ -73,7 +73,7 @@ A floor can swap its issues board, its PR board or both for a board of its own w
     "issues": {
       "type": "mcp",
       "title": "🔥 Hot",
-      "mcp": { "url": "https://support.example.com/api/mcp", "tokenEnv": "SUPPORT_MCP_TOKEN" },
+      "mcp": { "url": "https://support.example.com/api/mcp", "tokenEnv": "AGENT_OFFICE_MCP_SUPPORT" },
       "refreshSec": 120,
       "columns": [
         { "title": "Critical", "tool": "get_tasks", "args": { "priority": "critical" },
@@ -92,17 +92,17 @@ A floor can swap its issues board, its PR board or both for a board of its own w
 
 - **Boards.** `boards` has at most two keys, `issues` and `pulls`, the board each one takes the place of. Each has a `type`, `mcp` or `activity`, and a `title` the board shows.
 - **`mcp`** asks an MCP server's tools over Streamable HTTP and shows what they return. It reads only: the board calls the tools you name and nothing else.
-  - `mcp.url`: the server, over `https` (plain `http` only to `localhost`, `127.0.0.1` or `[::1]`).
-  - `mcp.tokenEnv`: the name of an environment variable of the office's own (`SUPPORT_MCP_TOKEN=… agent-office`) that holds the token, sent as `Authorization: Bearer <token>`. The token is read from the office's environment and never reaches the browser; only the fields the item templates name do. Without the variable the board makes no call and says which variable is missing.
+  - `mcp.url`: the server, over `https` (plain `http` only to `localhost`, `127.0.0.1` or `[::1]`). A private-network IP address in the URL is refused: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `100.64.0.0/10`, `0.0.0.0/8`, `fc00::/7` and `fe80::/10`, IPv4-mapped forms such as `[::ffff:10.0.0.1]` included. Loopback stays allowed, for an MCP server on the office's own machine.
+  - `mcp.tokenEnv`: the name of an environment variable of the office's own (`AGENT_OFFICE_MCP_SUPPORT=… agent-office`) that holds the token, sent as `Authorization: Bearer <token>`. The token is read from the office's environment and never reaches the browser; only the fields the item templates name do. Without the variable the board makes no call and says which variable is missing. The name must start with `AGENT_OFFICE_MCP_` (then capital letters, digits and `_`): the file is committed with the project, so it may only name tokens the office set aside for boards, not any secret in the office's environment.
   - `refreshSec`: how often it loads, in whole seconds, at least 30 (default 120). A floor nobody is on loads five times less often.
   - `columns`: 1 to 4 of them.
-- **A column** calls one tool, which must answer with text holding a JSON array of rows, within 15 seconds.
+- **A column** calls one tool, which must answer within 15 seconds with text holding JSON: either an array of rows, or an object with the array under `rows`, `items`, `results` or `data` (with `truncated: true` when the tool had more than it sent).
   - `title` and `tool`, the column's heading and the tool it calls; `args`, an object sent to the tool as it is.
   - `item`: how a row is shown, as templates with `{field}` for a row's fields: `id` and `title` are required, `sub` (the small line under it) is optional.
   - `where` (optional): `field → condition`, all of them must hold. A condition is a value the field must equal (a string, number, `true`/`false` or `null`), or `"<now"` / `">now"` for a date (`YYYY-MM-DD` or `YYYY-MM-DD HH:MM[:SS]`) before or after now; a row without a date there is left out.
   - `sort` (optional): a field to order by, `-field` for descending; rows without it go last either way.
   - `limit`: how many rows the column shows, 1 to 20 (default 8). **E** at the board opens the whole list.
   - `tone` (optional): `hot`, `warn` or `ok`, the color its cards get.
-- **`activity`** shows the floor's agents instead: **Now**, the workers at their desks with what they're on (waiting for you is `hot`, working `warn`, done or idle `ok`), and **Recent**, the last 30 who went home with what they had been on, kept in the floor's `.agent-office/activity.json`. Board agents aren't on it. `now` and `recent` rename the two columns, e.g. `{ "type": "activity", "title": "🤖 Agents", "now": "Busy", "recent": "Gone home" }`.
+- **`activity`** shows the floor's agents instead: **Now**, the workers at their desks with what they're on (waiting for you is `hot`, working `warn`, done or idle `ok`), and **Recent**, the last 8 who went home with what they had been on. The log behind it, in the floor's `.agent-office/activity.json`, keeps the newest 30. Board agents aren't on it. `now` and `recent` rename the two columns, e.g. `{ "type": "activity", "title": "🤖 Agents", "now": "Busy", "recent": "Gone home" }`.
 
-When a board can't load (no token, the server refused it, a timeout, an answer that isn't a JSON array), it says why and keeps showing what it last loaded, with the time it did. One column failing leaves the others as they are. A file that isn't valid opens the floor anyway, with the reason on the board and in the office's log.
+When a board can't load (no token, the server refused it, a timeout, an answer that isn't a list of rows), it says why and keeps showing what it last loaded, with the time it did. One column failing leaves the others as they are. A file that isn't valid opens the floor anyway, with the reason on the board and in the office's log.
