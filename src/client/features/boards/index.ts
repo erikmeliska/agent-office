@@ -17,6 +17,7 @@ import { openServices } from '../../ui/services';
 import { BoardTexture, QueueBoardTexture, ServicesBoardTexture } from './world';
 import { MachineTexture } from './machine';
 import { MeetingBoardTexture, MeetingSignTexture } from './meeting';
+import type { FeedsPart } from '../feeds';
 import type { World } from '../../world/world';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
@@ -38,6 +39,8 @@ export interface BoardsDeps {
   boardActions(): BoardActions;
   /** The task queue's window. */
   showQueue(): void;
+  /** Feed boards this floor puts on the issues or PR board instead (see features/feeds). */
+  feeds(): FeedsPart;
 }
 
 export function installBoards(ctx: Ctx, deps: BoardsDeps) {
@@ -86,6 +89,15 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   const pullsTex = new BoardTexture('pulls');
   const renderPullsBoard = () => pullsTex.render(store.pulls, store.workers);
   mountBoard(office.boardMeshes.pulls, pullsTex.texture, renderPullsBoard, ['pulls']);
+  // A floor with a feed on the issues or PR board shows that instead (agent-office.boards.json).
+  let dressed: { boardMeshes: Partial<Record<'issues' | 'pulls', THREE.Mesh>> } = office;
+  function dressFeeds() {
+    const m = dressed.boardMeshes;
+    if (m.issues) showOn(m.issues, deps.feeds().texture('issues') ?? issuesTex.texture);
+    if (m.pulls) showOn(m.pulls, deps.feeds().texture('pulls') ?? pullsTex.texture);
+  }
+  store.on('feeds', dressFeeds);
+  dressFeeds();
   // PR notes name the desk they came from. Redraw when that changes, not on every worker update.
   let deskLinks = '';
   store.on('workers', () => {
@@ -103,11 +115,14 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   ctx.interactions.define('issues', {
     reach: 9,
     hint: () => {
+      const fed = deps.feeds().hint('issues');
+      if (fed) return fed;
       const aimedNote = deps.aimedNote();
       if (aimedNote) return { k: String(aimedNote.number), parts: [hintTitle(clip(`📌 #${aimedNote.number} ${aimedNote.title}`, 60)), key('E', 'Take it'), key('O', 'Read it')] };
       return issuesTex.hasNotes ? { k: 'notes', parts: [hintTitle('📌 Issues board'), key('E', 'Open'), aside('or point at a note to take it')] } : boardHint('📌 Issues board');
     },
     use: (_it, key, note) => {
+      if (deps.feeds().use('issues', key)) return;
       // A note on the issues board: E takes it straight off the cork, O opens it to read first.
       if (note && key === 'E') return deps.pickUp(note);
       if (note && key === 'O') return openIssue(note, ctx.net, deps.boardActions());
@@ -116,8 +131,11 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   });
   ctx.interactions.define('pulls', {
     reach: 9,
-    hint: () => boardHint('🔀 Pull request board'),
-    use: onE(() => openBoard('pulls', ctx.net, deps.boardActions())),
+    hint: () => deps.feeds().hint('pulls') ?? boardHint('🔀 Pull request board'),
+    use: (_it, key) => {
+      if (deps.feeds().use('pulls', key)) return;
+      if (key === 'E') openBoard('pulls', ctx.net, deps.boardActions());
+    },
   });
   ctx.interactions.define('services', {
     reach: 9,
@@ -142,8 +160,8 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   mountBoard(office.meetingSign, meetingSignTex.texture, () => meetingSignTex.render(store.meeting), ['meeting']);
   /** Puts every board's texture up on `w`'s boards. */
   function dressBoards(w: World) {
-    showOn(w.boardMeshes.issues, issuesTex.texture);
-    showOn(w.boardMeshes.pulls, pullsTex.texture);
+    dressed = w;
+    dressFeeds();
     showOn(w.boardMeshes.services, servicesTex.texture);
     showOn(w.boardMeshes.queue, queueTex.texture);
     if (w.meetingBoard) showOn(w.meetingBoard, meetingBoardTex.texture);

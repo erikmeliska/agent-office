@@ -73,4 +73,6 @@ export const views: ViewPieces = {
   whiteboard: whiteboardView,
   meeting: meetingView,
   cabinet: cabinetView,
+  // Feed boards: until the floor's own feeds module puts some up (agent-office.boards.json), none.
+  feeds: () => [],
 };
