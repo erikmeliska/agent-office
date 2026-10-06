@@ -38,6 +38,7 @@ import { installCarrying } from './features/carrying';
 import { installCars } from './features/cars';
 import { installChat } from './features/chat';
 import { installClimbing } from './features/climbing';
+import { installFeeds } from './features/feeds';
 import { installCoffee } from './features/coffee';
 import { installDictation } from './features/dictation';
 import { installDog } from './features/dog';
@@ -94,7 +95,8 @@ parts.worlds = createWorlds(ctx);
 installSky(ctx);
 
 // ---- The install list ---------------------------------------------------------------------------
-parts.boards = installBoards(ctx, { aimedNote: () => parts.pointer.aimedNote(), pickUp: (it) => parts.cards.pickUp(it), boardActions: () => parts.actions.boardActions(), showQueue: () => parts.waiting.showQueue() });
+parts.feeds = installFeeds(ctx);
+parts.boards = installBoards(ctx, { aimedNote: () => parts.pointer.aimedNote(), pickUp: (it) => parts.cards.pickUp(it), boardActions: () => parts.actions.boardActions(), showQueue: () => parts.waiting.showQueue(), feeds: () => parts.feeds });
 parts.gallery = installGallery(ctx);
 installWhiteboard(ctx);
 // Onto whatever you're walking on: the office's floor and furniture, or the roof's.

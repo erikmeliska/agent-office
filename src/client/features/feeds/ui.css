@@ -1,0 +1,9 @@
+.feed { display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; }
+.feed-col { flex: 1 1 0; min-width: 220px; }
+.feed-col h3 { margin: 0 0 8px; font-size: 15px; }
+.feed-item { display: block; padding: 6px 8px; margin-bottom: 6px; border-left: 4px solid #8d99ae; border-radius: 6px; background: rgba(255, 255, 255, 0.05); }
+.feed-item.hot { border-left-color: #ef476f; }
+.feed-item.warn { border-left-color: #ffd166; }
+.feed-item.ok { border-left-color: #06d6a0; }
+.feed-item small { display: block; opacity: 0.65; }
+.feed-empty { opacity: 0.5; }
