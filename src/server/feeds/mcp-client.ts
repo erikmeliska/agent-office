@@ -1,12 +1,24 @@
 // Just enough of an MCP client (Streamable HTTP) for a feed board: initialize once per session, then
 // tools/call. Answers come as JSON or as server-sent events; a tool's answer is text holding a JSON list.
+import { lookup as dnsLookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import type { Row } from './columns.js';
+import { isPrivateIp } from './config.js';
 
 export interface McpCaller {
   call(tool: string, args: Record<string, unknown>): Promise<{ rows: Row[]; truncated: boolean }>;
 }
 
 export class McpError extends Error {}
+
+/** Every address a hostname resolves to; dns by default, swapped out in tests. */
+export type Resolver = (hostname: string) => Promise<{ address: string }[]>;
+const resolveAll: Resolver = (hostname) => dnsLookup(hostname, { all: true });
+
+export interface McpClientOptions {
+  timeoutMs?: number;
+  resolve?: Resolver;
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const PROTOCOL = '2025-06-18';
@@ -55,13 +67,18 @@ export class McpHttpClient implements McpCaller {
   private session?: string;
   private ready?: Promise<void>;
   private nextId = 1;
+  private timeoutMs: number;
+  private resolve: Resolver;
 
   constructor(
     private url: string,
     private token: () => string | undefined,
     private tokenEnv: string,
-    private timeoutMs = 15_000,
-  ) {}
+    opts: McpClientOptions = {},
+  ) {
+    this.timeoutMs = opts.timeoutMs ?? 15_000;
+    this.resolve = opts.resolve ?? resolveAll;
+  }
 
   async call(tool: string, args: Record<string, unknown>): Promise<{ rows: Row[]; truncated: boolean }> {
     const token = this.token();
@@ -84,9 +101,20 @@ export class McpHttpClient implements McpCaller {
     }
   }
 
+  /** config.ts refused private IP literals in the URL; a name has to be resolved before each request. */
+  private async checkHost() {
+    const host = new URL(this.url).hostname.replace(/^\[|\]$/g, '');
+    if (isIP(host)) return;
+    const addrs = await this.resolve(host);
+    if (addrs.some((a) => isPrivateIp(a.address))) throw new McpError('mcp.url resolves into a private network');
+  }
+
   private async post(body: object, token: string) {
+    await this.checkHost();
     const res = await fetch(this.url, {
       method: 'POST',
+      // A redirect could lead into the private network, so none is followed.
+      redirect: 'manual',
       signal: AbortSignal.timeout(this.timeoutMs),
       headers: {
         'content-type': 'application/json',
@@ -106,6 +134,7 @@ export class McpHttpClient implements McpCaller {
     try {
       r = await this.post({ jsonrpc: '2.0', id, method, params }, token);
     } catch (e) {
+      if (e instanceof McpError) throw e;
       const err = e as Error;
       throw new McpError(err.name === 'TimeoutError' || err.name === 'AbortError' ? 'timed out' : `unreachable (${err.message})`);
     }
@@ -115,6 +144,7 @@ export class McpHttpClient implements McpCaller {
       this.ready = undefined;
       throw new McpError('session expired');
     }
+    if (r.status >= 300 && r.status < 400) throw new McpError(`redirected (HTTP ${r.status}), not followed`);
     if (r.status < 200 || r.status >= 300) throw new McpError(`HTTP ${r.status}`);
     const sid = r.headers.get('mcp-session-id');
     if (sid) this.session = sid;
