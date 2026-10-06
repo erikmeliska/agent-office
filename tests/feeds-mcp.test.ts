@@ -119,7 +119,28 @@ test('a name that resolves into a private network is refused before any request'
   assert.equal(mcp.seen.length, 0);
 });
 
-test('a name that resolves to loopback is allowed; an IP literal is not looked up', async (t) => {
+test('a name other than localhost that resolves to loopback is refused before any request', async (t) => {
+  const mcp = await fakeMcp(standard([{ id: 1 }]));
+  t.after(mcp.close);
+  for (const address of ['127.0.0.1', '127.8.9.10', '::1', '::ffff:127.0.0.1']) {
+    const resolve = async () => [{ address }];
+    const url = mcp.url.replace('127.0.0.1', 'loopback.example.com');
+    await assert.rejects(new McpHttpClient(url, () => 't', 'T', { resolve }).call('x', {}), /mcp\.url resolves into a private network/, address);
+  }
+  assert.equal(mcp.seen.length, 0);
+});
+
+test('an answer past the size cap is refused', async (t) => {
+  const mcp = await fakeMcp((body, _req, res) => {
+    if (body.method === 'notifications/initialized') return void res.writeHead(202).end();
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { pad: 'x'.repeat(5 * 1024 * 1024) } }));
+  });
+  t.after(mcp.close);
+  await assert.rejects(new McpHttpClient(mcp.url, () => 't', 'T').call('x', {}), /answer too large/);
+});
+
+test('localhost and 127.0.0.1 reach loopback; an IP literal is not looked up', async (t) => {
   const mcp = await fakeMcp(standard([{ id: 1 }]));
   t.after(mcp.close);
   const asked: string[] = [];
@@ -144,7 +165,9 @@ test('the address checked is the one connected to, so re-pointing the name is ca
     asked.push(host);
     return [{ address: answer }];
   };
-  const client = new McpHttpClient(mcp.url.replace('127.0.0.1', 'rebind.example.com'), () => 't', 'T', { resolve });
+  // The fake name stands in for localhost here, so its loopback answer is allowed until it changes.
+  const loopbackHosts = new Set(['rebind.example.com']);
+  const client = new McpHttpClient(mcp.url.replace('127.0.0.1', 'rebind.example.com'), () => 't', 'T', { resolve, loopbackHosts });
   // The name reaches the fake server only through the resolver's answer, never through system DNS.
   assert.deepEqual((await client.call('x', {})).rows, [{ id: 1 }]);
   const before = mcp.seen.length;
