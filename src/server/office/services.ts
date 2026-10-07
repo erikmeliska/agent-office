@@ -7,10 +7,14 @@ import { Team } from '../team.js';
 import { Upgrader } from '../upgrade.js';
 import { Services } from '../services.js';
 import { ImageProxy } from '../decor.js';
+import { WallStore } from '../wall.js';
 import { Ledger } from '../usage.js';
 import { PlanLimitsReader } from '../limits.js';
 import { Webhook } from '../webhook.js';
 import { Machine } from '../machine.js';
+import { AppScreen } from '../appscreen/index.js';
+import { Spotify } from '../spotify.js';
+import { OFFICE_MAP } from '../../shared/maps/index.js';
 import type { Floor } from '../floor.js';
 import { Sky } from '../sky.js';
 import { Themes } from '../theme.js';
@@ -125,7 +129,23 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  // The meeting room's screen: its pages, snapshotted while someone is on a floor of the office map
+  // (the only one with the screen), and its apps served on a port of its own for its window.
+  const appScreen = new AppScreen({
+    dataDir: cfg.dataDir,
+    url: cfg.meetingScreenUrl,
+    host: cfg.host,
+    port: cfg.meetingScreenPort,
+    tls: cfg.tls,
+    signedIn: (req) => ctx.auth.fromAnyCookie(req),
+    active: () => ctx.maps.pick() === OFFICE_MAP && [...clients.values()].some((c) => !c.out && ctx.floorOf(c)),
+    changed: (state) => ctx.broadcast({ t: 'appScreen', state }),
+  });
+  appScreen.start();
+  // The Spotify app on this machine, for the jukebox: there only on a Mac that has it.
+  const spotify = new Spotify();
+
+  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, appScreen, spotify, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */
@@ -152,6 +172,9 @@ export function createLateServices(ctx: Ctx): LateServices {
   );
 
   const images = new ImageProxy();
+  // Pictures uploaded for the walls, shared by every floor (any floor's wall can show one).
+  const wall = new WallStore(cfg.dataDir, () => new Set([...floors.values()].flatMap((f) => f.decor.list().map((d) => d.url))));
+  wall.sweep();
 
   const upgrader = new Upgrader(
     (state) => ctx.broadcast({ t: 'upgrade', state }),
@@ -161,5 +184,5 @@ export function createLateServices(ctx: Ctx): LateServices {
       process.kill(process.pid, 'SIGTERM');
     },
   );
-  return { team, tailnet, services, images, upgrader, servicesState };
+  return { team, tailnet, services, images, wall, upgrader, servicesState };
 }

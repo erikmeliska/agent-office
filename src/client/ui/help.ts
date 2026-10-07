@@ -28,9 +28,9 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['R', 'Resume a sleeping worker'],
   ['X', 'Send a worker home (frees the desk)'],
   ['L', 'Hang a big sign over the desk you face ("Operations", "Code cleanup"), or change or take down the one there'],
-  ['🚧', 'Room to grow: E at the sign on the north wall past the gong knocks through into a back office with 2 more desks, and again for 2 more. The same sign walls a row back up'],
-  ['F', 'Hang a picture from the web on a wall. Look at a picture and press E to move, edit or take it down'],
+  ['F', 'Hang a picture on a wall: a link from the web, or your own (upload it, drop it or paste a screenshot). Look at a picture and press E to move, edit or take it down'],
   ['Q', 'Put back the issue card in your hands (E at a note on the issues board, or ✋ Pick it up in an issue; then E at an empty desk, a worker or the queue board), or drop the basketball'],
+  ['🧻', "The restroom behind the gong, through the WC door: sit on the toilet and press E to tell the hajzel baba an idea. Her terminal opens, she asks what it's for, and files it as a GitHub issue labelled idea once you say yes. Only on a floor with a GitHub repo. Walking off ends the brainstorm, after you confirm"],
   ['🐶', 'Walk up to the office dog and press E to pet it. When a worker needs input, it runs to that desk and barks. Name it in ⚙️ Settings'],
   ['O', 'Open a pull request for a worker on its own branch, or see the one it has'],
   ['T', 'Chat'],
@@ -44,4 +44,5 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['Esc', 'Close any window and get back to looking around'],
   ['Ctrl + [', 'Send Esc to a terminal instead, to close a menu like Claude’s /skills or interrupt Claude. ⎋ Esc in the terminal’s header does the same'],
   ['⚙️', 'Settings (in the ☰ menu): switch between first and third person'],
+  ['🖥️', "The big screen in the meeting room shows a web page everyone sees, snapshotted live: an app the team keeps an eye on, the lunch menu. Press E at it to use the page itself, put up another of its saved pages with one click, or let them take turns. Admins add pages under ⚙️ Pages there"],
 ];

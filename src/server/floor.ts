@@ -118,7 +118,7 @@ export class Floor {
   readonly queue: TaskQueue;
   readonly changes: Changes;
   readonly decor: Decor;
-  /** The signs over its desks, and how far its back office is built out. */
+  /** The signs over its desks. */
   readonly plan: FloorPlanStore;
   readonly jukebox: Jukebox;
   /** The whiteboard everyone on the floor draws on together. */
@@ -156,7 +156,7 @@ export class Floor {
     mkdirSync(dataDir, { recursive: true, mode: 0o700 });
     excludeFromGit(def.dir);
     this.project = projectInfo(def.dir, def.name, ctx.agentCmd, ctx.agentArgs);
-    this.docs = new Docs(def.dir);
+    this.docs = new Docs(def.dir, dataDir);
     // Before the workers and the dog: the back office's desks are only there once it's built.
     this.plan = new FloorPlanStore(dataDir);
     this.jail = new Jail(dataDir);
@@ -166,7 +166,6 @@ export class Floor {
       workers: () => this.workers?.list() ?? [],
       people: () => ctx.peers(this),
       send: (dog) => ctx.emit(this, { t: 'dog', dog }),
-      wing: () => this.plan.wing,
     });
     this.feeds = new Feeds(def.dir, dataDir, {
       send: (feeds) => ctx.emit(this, { t: 'feeds', feeds }),
@@ -215,7 +214,7 @@ export class Floor {
       ctx.runAs,
       ctx.dshProfile,
     );
-    this.workers.wing = () => this.plan.wing;
+    this.workers.repo = def.repo;
 
     this.github = new GitHub(
       def.dir,
@@ -414,7 +413,6 @@ export class Floor {
       busy: ws.filter((w) => w.status === 'working').length,
       waiting: ws.filter((w) => w.kind === 'agent' && (w.status === 'needs_input' || (w.status === 'done' && !w.acked))).length,
       people: this.ctx.people(this),
-      wing: this.plan.wing,
     };
   }
 

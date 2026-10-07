@@ -5,6 +5,7 @@
 // unions every frame is one of.
 
 import type { AccountsClientMsg, AccountsServerMsg, SignInsClientMsg, TeamClientMsg } from './protocol/accounts.js';
+import type { AppScreenClientMsg, AppScreenServerMsg } from './protocol/appscreen.js';
 import type { ChangesClientMsg, ChangesServerMsg } from './protocol/changes.js';
 import type { FloorClientMsg, FloorServerMsg, PlanClientMsg } from './protocol/floors.js';
 import type { FeedsServerMsg } from './protocol/feeds.js';
@@ -14,12 +15,13 @@ import type { PresenceClientMsg, PresenceServerMsg } from './protocol/presence.j
 import type { QueueClientMsg, QueueServerMsg } from './protocol/queue.js';
 import type { RooftopClientMsg, RooftopServerMsg } from './protocol/rooftop.js';
 import type { SettingsClientMsg, SettingsServerMsg } from './protocol/settings.js';
-import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, DogClientMsg, JukeboxClientMsg, ToysServerMsg, WhiteboardClientMsg } from './protocol/toys.js';
+import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, DogClientMsg, JukeboxClientMsg, SpotifyClientMsg, ToysServerMsg, WhiteboardClientMsg } from './protocol/toys.js';
 import type { UsageClientMsg, UsageServerMsg } from './protocol/usage.js';
 import type { WorkerClientMsg, WorkerServerMsg } from './protocol/workers.js';
 
 export * from './protocol/accounts.js';
 export * from './protocol/agents.js';
+export * from './protocol/appscreen.js';
 export * from './protocol/changes.js';
 export * from './protocol/floors.js';
 export * from './protocol/feeds.js';
@@ -50,11 +52,13 @@ export type ClientMsg =
   | UsageClientMsg
   | DecorClientMsg
   | JukeboxClientMsg
+  | SpotifyClientMsg
   | CabinetClientMsg
   | WhiteboardClientMsg
   | BallClientMsg
   | CarClientMsg
-  | DogClientMsg;
+  | DogClientMsg
+  | AppScreenClientMsg;
 
 export type ServerMsg =
   | PresenceServerMsg
@@ -69,4 +73,5 @@ export type ServerMsg =
   | SettingsServerMsg
   | UsageServerMsg
   | ToysServerMsg
-  | FeedsServerMsg;
+  | FeedsServerMsg
+  | AppScreenServerMsg;

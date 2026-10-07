@@ -2,6 +2,7 @@
 // floor. A new feature adds its handler file and a line here.
 import type { ClientMsg } from '../../../shared/protocol.js';
 import { accountsHandlers } from './accounts.js';
+import { appScreenHandlers, appScreenView } from './appscreen.js';
 import { ballHandlers, ballHooks, ballView } from './ball.js';
 import { cabinetHandlers, cabinetHooks, cabinetView } from './cabinet.js';
 import { carHandlers, carHooks, carsView } from './car.js';
@@ -12,6 +13,7 @@ import { feedsView } from './feeds.js';
 import { floorHandlers, projectView } from './floors.js';
 import { githubHandlers, issuesView, pullsView } from './github.js';
 import { jukeboxHandlers, jukeboxView } from './jukebox.js';
+import { spotifyHandlers } from './spotify.js';
 import { meetingHandlers, meetingView } from './meetings.js';
 import { planHandlers, planView } from './plan.js';
 import { presenceHandlers } from './presence.js';
@@ -28,6 +30,7 @@ import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 /** Each domain's handlers put together, in alphabetical order. */
 export const handlers: HandlerMap<ClientMsg> = {
   ...accountsHandlers,
+  ...appScreenHandlers,
   ...ballHandlers,
   ...cabinetHandlers,
   ...carHandlers,
@@ -37,6 +40,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...floorHandlers,
   ...githubHandlers,
   ...jukeboxHandlers,
+  ...spotifyHandlers,
   ...meetingHandlers,
   ...planHandlers,
   ...presenceHandlers,
@@ -75,4 +79,5 @@ export const views: ViewPieces = {
   meeting: meetingView,
   cabinet: cabinetView,
   feeds: feedsView,
+  appScreen: appScreenView,
 };

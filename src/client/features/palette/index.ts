@@ -3,10 +3,9 @@
  * requests, issues and services, and the people in it. Enter does it; Shift+Enter walks you over to
  * where it's done first.
  */
-import { DESK_BY_ID, DESKS, WING_DESKS, deskSeat, type DeskDef } from '../../../shared/layout';
+import { DESK_BY_ID, DESKS, deskSeat, type DeskDef } from '../../../shared/layout';
 import { isPaletteKey } from '../../../shared/palette';
 import type { Ctx } from '../../core/context';
-import { seatBuilt } from '../../core/floors';
 import type { Parts } from '../../core/parts';
 import { STATION_INFO } from '../../core/stations';
 import { isTyping } from '../../player';
@@ -46,8 +45,8 @@ export function installPalette(ctx: Ctx, parts: PaletteParts) {
   function nearestFreeDesk(): DeskDef | undefined {
     let best: DeskDef | undefined;
     let bestD = Infinity;
-    for (const d of [...DESKS, ...WING_DESKS]) {
-      if (store.workerAtDesk(d.id) || !office.desks.has(d.id) || !seatBuilt(d.id)) continue;
+    for (const d of DESKS) {
+      if (store.workerAtDesk(d.id) || !office.desks.has(d.id)) continue;
       const dist = Math.hypot(d.x - player.pos.x, d.z - player.pos.z);
       if (dist < bestD) {
         best = d;
@@ -97,7 +96,7 @@ export function installPalette(ctx: Ctx, parts: PaletteParts) {
     out.push({ icon: '⚙️', kind: 'Action', title: 'Settings', keywords: ['preferences', 'options'], open: () => parts.hud.showSettings() });
     if (store.invites) out.push({ icon: '👥', kind: 'Action', title: 'Invite teammates', keywords: ['team', 'add people'], open: () => openTeam(net) });
     else if (store.me.admin) out.push({ icon: '👥', kind: 'Action', title: 'Invite people', detail: 'Accounts', keywords: ['invite teammates', 'accounts', 'team'], open: () => openAccounts(net) });
-    out.push({ icon: '🖼️', kind: 'Action', title: 'Hang a picture', detail: 'On a wall of this floor', keywords: ['decorate', 'frame', 'art'], open: hanging.startHanging });
+    out.push({ icon: '🖼️', kind: 'Action', title: 'Hang a picture', detail: 'On a wall of this floor', keywords: ['decorate', 'frame', 'art', 'upload', 'photo'], open: hanging.startHanging });
     out.push({ icon: '🔎', kind: 'Action', title: 'Search the chat and every terminal', keywords: ['find'], open: showSearch });
 
     out.push(at('issues', 'the Issues board', { icon: '📌', kind: 'Board', title: 'Issues board', open: () => openBoard('issues', net, actions.boardActions()) }));

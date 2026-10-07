@@ -4,7 +4,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -138,6 +138,9 @@ before(async () => {
   for (const args of [['init', '-q', '-b', 'main'], ['add', '.'], ['-c', 'user.name=test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'init']]) {
     execFileSync('git', args, { cwd: project });
   }
+  // The meeting room screen with no pages: nothing is snapshotted, or served, while the tests run.
+  mkdirSync(path.join(project, '.agent-office'), { recursive: true });
+  writeFileSync(path.join(project, '.agent-office', 'app-screen.json'), JSON.stringify({ pages: [], rotate: 0 }));
   // A client bundle of its own, so the test needn't build one.
   for (const page of ['index', 'login', 'claim', 'join', 'lite']) writeFileSync(path.join(publicDir, `${page}.html`), `<!doctype html><title>${page}</title>`);
   writeFileSync(path.join(publicDir, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
@@ -267,7 +270,7 @@ test('welcomes a browser and dispatches what it sends', async () => {
   assert.equal(ada?.name, 'Ada');
   assert.equal(ada?.color, '#ff8a5b');
   assert.equal(ada?.floor, floor.id);
-  assert.deepEqual(Object.keys(welcome).slice(-18), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'ball', 'cars', 'jail', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'feeds']);
+  assert.deepEqual(Object.keys(welcome).slice(-19), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'ball', 'cars', 'jail', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'feeds', 'appScreen']);
 
   a.send({ t: 'ping', at: 42 });
   const pong = await a.take('pong');
@@ -451,12 +454,15 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   a.send({ t: 'term.input', workerId: 'nope', data: 'ls' });
   a.send({ t: 'term.typing', workerId: 'nope' });
   a.send({ t: 'term.resize', workerId: 'nope', cols: 80, rows: 24 });
-  a.send({ t: 'floor.expand' });
-  assert.equal((await a.take('plan')).plan.wing, 1);
-  assert.match(await told('🔨'), /^🔨 Eve knocked out the back wall: Desk \d+ and Desk \d+ are ready for workers$/);
-  a.send({ t: 'floor.shrink' });
-  assert.equal((await a.take('plan')).plan.wing, 0);
-  assert.match(await told('🧱'), /^🧱 Eve walled the back office back up, and Desk \d+ and Desk \d+ went with it$/);
+  // The hajzel baba hears only whoever sits on the toilet, and only on a floor with a GitHub repo, which this one isn't.
+  a.send({ t: 'station.prompt', deskId: 'station-restroom', prompt: 'An idea' });
+  await warned('Sit on the toilet to tell the hajzel baba your idea');
+  a.send({ t: 'worker.spawn', deskId: 'station-restroom', prompt: 'An idea' });
+  await warned('Sit on the toilet to tell the hajzel baba your idea');
+  a.send({ t: 'sit', seat: 'toilet:0' });
+  a.send({ t: 'station.prompt', deskId: 'station-restroom', prompt: 'An idea' });
+  await warned('Ideas have nowhere to go here: this floor has no GitHub repo.');
+  a.send({ t: 'sit' });
   a.send({ t: 'floor.projectsDir', dir: 'relative/dir' });
   await warned('Use a full path, like ~/Workspace');
   a.send({ t: 'floor.remove', floor: 'nope' });
@@ -469,6 +475,45 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   assert.deepEqual([...a.pending('toast'), ...a.pending('gh.merged'), ...a.pending('gh.closed')], []);
   a.send({ t: 'machine.limit', limit: null });
   await a.take('machine', (m) => m.state.limit === undefined);
+  await a.close();
+});
+
+test('a picture uploaded for the wall is served from the office, and deleted once it comes down', async () => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  const upload = (body: BodyInit, headers: Record<string, string>) => fetch(base + '/api/wall', { method: 'POST', body, headers: { 'content-type': 'image/png', ...headers } });
+  assert.equal((await upload(png, {})).status, 401);
+  assert.equal((await upload(png, { cookie })).status, 403);
+  assert.equal((await upload(png, { cookie, origin: 'http://evil.example' })).status, 403);
+  const me = { cookie, origin: base };
+  const notPicture = await upload('<html></html>', me);
+  assert.equal(notPicture.status, 415);
+  const ok = await upload(png, me);
+  assert.equal(ok.status, 200);
+  const { url } = (await ok.json()) as { url: string };
+  assert.match(url, /^\/api\/wall\/[0-9a-f]{64}\.png$/);
+  const file = path.join(tmp, 'project', '.agent-office', 'wall', url.slice('/api/wall/'.length));
+  assert.ok(existsSync(file));
+
+  assert.equal((await get(url)).status, 401);
+  const served = await get(url, { cookie });
+  assert.equal(served.status, 200);
+  assert.equal(served.headers.get('content-type'), 'image/png');
+  assert.match(served.headers.get('content-security-policy') ?? '', /sandbox/);
+  assert.equal(served.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(Buffer.from(await served.arrayBuffer()), png);
+  assert.equal((await get(`/api/wall/${'0'.repeat(64)}.png`, { cookie })).status, 404);
+
+  // Hung, it stays; taken down with nothing else showing it, its file goes.
+  const a = await Browser.open('?name=Ed');
+  await a.take('welcome');
+  a.send({ t: 'decor.add', decor: { url, wall: 'north', u: 0, y: 1.5, w: 1, h: 1, frame: 0 } });
+  const hung = (await a.take('decor', (m) => m.items.some((d) => d.url === url))).items.find((d) => d.url === url)!;
+  assert.ok(existsSync(file));
+  a.send({ t: 'decor.remove', id: hung.id });
+  await a.take('decor', (m) => !m.items.some((d) => d.url === url));
+  assert.ok(!existsSync(file));
+  a.send({ t: 'decor.add', decor: { url, wall: 'north', u: 0, y: 1.5, w: 1, h: 1, frame: 0 } });
+  assert.equal((await a.take('toast', (m) => m.level === 'warn')).text, "That picture isn't on the office anymore. Upload it again.");
   await a.close();
 });
 

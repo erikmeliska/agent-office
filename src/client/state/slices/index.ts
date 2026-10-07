@@ -10,6 +10,7 @@
 import type { Slice } from '../store';
 import { building, floor, me, presence } from '../core';
 import { accounts } from './accounts';
+import { appScreen } from './appscreen';
 import { ball } from './ball';
 import { cabinet } from './cabinet';
 import { cars } from './cars';
@@ -19,6 +20,7 @@ import { feeds } from './feeds';
 import { floorPlan } from './floor-plan';
 import { jail } from './jail';
 import { jukebox } from './jukebox';
+import { spotify } from './spotify';
 import { leaveOnMerge } from './leave-on-merge';
 import { machine } from './machine';
 import { map } from './map';
@@ -63,4 +65,6 @@ export const SLICES: readonly Slice[] = [
   accounts,
   signins,
   feeds,
+  appScreen,
+  spotify,
 ];

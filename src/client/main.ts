@@ -33,6 +33,7 @@ import { installBarGames } from './features/bargames';
 import { installBasketball } from './features/basketball';
 import { installBoards } from './features/boards';
 import { installBookshelf } from './features/bookshelf';
+import { installAppScreen } from './features/appscreen';
 import { installCabinet } from './features/cabinet';
 import { installCarrying } from './features/carrying';
 import { installCars } from './features/cars';
@@ -53,8 +54,10 @@ import { installMeeting } from './features/meeting';
 import { installNeedsYou } from './features/needsyou';
 import { installPalette } from './features/palette';
 import { installPeers } from './features/peers';
+import { installRestroom } from './features/restroom';
 import { installRooftop } from './features/rooftop';
 import { installSeating } from './features/seating';
+import { installToilet } from './features/restroom/toilet';
 import { installSmoke } from './features/smoke';
 import { installLamplight } from './features/lamplight';
 import { installTelescope } from './features/telescope';
@@ -150,6 +153,7 @@ parts.needsYou = installNeedsYou(ctx, parts);
 installPalette(ctx, parts);
 parts.meeting = installMeeting(ctx, parts);
 parts.bookshelf = installBookshelf(ctx);
+installAppScreen(ctx);
 installHerald(ctx, parts);
 
 parts.bar = installBar(ctx, { roof: parts.rooftop.roof, djAt: parts.rooftop.djAt, reach });
@@ -170,6 +174,8 @@ parts.cards = installCarrying(ctx, {
   showMeeting: parts.meeting.showMeeting,
 });
 parts.seating = installSeating(ctx, { shares: () => parts.talk.currentShares(), watchShare: () => parts.talk.watchShare(), arcade: parts.arcade, showBar: parts.bar.showBar, usable: () => parts.pointer.usable() });
+installToilet(ctx, parts);
+installRestroom(ctx, parts);
 installGong(ctx, { burstOver: parts.views.burstOver, workerViews: parts.views.workerViews, court: () => parts.worlds.court(), idleAgents: () => parts.worlds.idleAgents() });
 
 parts.hintbar = installHintBar(ctx, core, parts);
