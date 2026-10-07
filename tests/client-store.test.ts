@@ -300,3 +300,29 @@ test("a slice's topics fire in its place in the list; a floor's after the messag
   assert.equal((s as unknown as { hello(): string }).hello(), 'hi');
   assert.ok(!Object.keys(s).includes('hello'));
 });
+
+test('a floor from an office with no meeting room screen leaves the screen empty, not undefined', () => {
+  store.apply(msg({ t: 'floor.enter', peers: [peer('p-a', { floor: 'f2' })], ...floorView('f2') }));
+  assert.deepEqual(store.appScreen, { pages: [], rotate: 0 });
+});
+
+test('a listener that throws neither stops the others nor the message', () => {
+  const heard: string[] = [];
+  const error = console.error;
+  console.error = () => {};
+  const offs = [
+    store.on('appScreen', () => {
+      throw new Error('boom');
+    }),
+    store.on('appScreen', () => heard.push('screen')),
+    store.on('peers', () => heard.push('peers')),
+  ];
+  try {
+    store.apply(msg({ t: 'floor.enter', peers: [peer('p-a', { floor: 'f1' })], ...floorView('f1') }));
+  } finally {
+    console.error = error;
+    for (const off of offs) off();
+  }
+  assert.deepEqual(heard, ['screen', 'peers']);
+  assert.equal(store.floor, 'f1');
+});

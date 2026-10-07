@@ -141,8 +141,18 @@ export class Store {
     return () => set!.delete(fn);
   }
 
+  /**
+   * Fires `topic`. One listener that throws is logged and the rest still hear it: otherwise the message
+   * that fired it stops halfway, and a floor.enter that stops halfway leaves you in a dark elevator.
+   */
   emit(topic: Topic) {
-    this.subs.get(topic)?.forEach((fn) => fn());
+    this.subs.get(topic)?.forEach((fn) => {
+      try {
+        fn();
+      } catch (err) {
+        console.error(`agent-office: a listener for ${topic} failed`, err);
+      }
+    });
   }
 
   /** The floor you're on. */
