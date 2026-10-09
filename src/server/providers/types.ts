@@ -107,6 +107,11 @@ export interface ProviderAdapter<S = undefined, P = undefined> {
      * in), or undefined when it can. `early`: it hasn't started, or was already found blocked.
      */
     blocked?(text: string, early: boolean): string | undefined;
+    /**
+     * Reads what its screen says it's doing, for one whose hooks can't say it all (agy has none for a
+     * permission prompt): the visible screen, each time it changes while it runs and isn't blocked.
+     */
+    watch?(h: WorkerHandle<S>, text: string): void;
   };
   usage?: ProviderUsage<S>;
   /** The office names its workers' tasks (see TaskNamer); the others keep the task their first prompt gives. */

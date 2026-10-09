@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { AGENT_EFFORTS, isValidCodexModel, isValidCursorModel, isValidGrokModel, isValidOpenCodeModel, type AgentProvider, type ModelOption } from '../shared/providers.js';
+import { AGENT_EFFORTS, AGY_MODELS, isValidAgyModel, isValidCodexModel, isValidCursorModel, isValidGrokModel, isValidOpenCodeModel, type AgentProvider, type ModelOption } from '../shared/providers.js';
 
 /** A CLI that lists its models in a second or two takes ten times that on a busy machine. */
 export const MODEL_COMMAND_TIMEOUT_MS = 30_000;
@@ -175,6 +175,29 @@ export async function fetchCursorModels(command: string, cwd: string, runner: Mo
   }
 }
 
+/**
+ * Run `agy models` without a shell: one model a line, its id and its name with a tab between. An
+ * agy that can't be asked (not installed, not signed in) or lists nothing gets the models it listed
+ * when the office learned it (AGY_MODELS), so the hire dialog always has Gemini to pick.
+ */
+export async function fetchAgyModels(command: string, cwd: string, runner: ModelCommandRunner = runModelCommand): Promise<ModelOption[]> {
+  let models: ModelOption[] = [];
+  try {
+    const result = await runner(command, ['models'], { cwd, timeout: MODEL_COMMAND_TIMEOUT_MS, maxBuffer: MODEL_COMMAND_MAX_BUFFER });
+    for (const raw of plain(result.stdout).split(/\r?\n/)) {
+      const [id, label] = raw.split('\t').map((part) => part.trim());
+      // A model's line is its id, a tab and its name: anything else is a message (an error, a notice).
+      if (label === undefined || !isValidAgyModel(id)) continue;
+      const name = shownName(label, id);
+      models.push({ id, ...(name ? { name } : {}) });
+    }
+    models = unique(models);
+  } catch {
+    models = [];
+  }
+  return models.length ? models : AGY_MODELS.map((m) => ({ ...m }));
+}
+
 type ModelLister = (command: string, cwd: string, runner?: ModelCommandRunner) => Promise<ModelOption[]>;
 
 /** The providers whose CLI lists its models (ProviderMeta.models.catalog), and how each is asked. */
@@ -183,6 +206,7 @@ export const MODEL_LISTERS: Partial<Record<AgentProvider, ModelLister>> = {
   codex: fetchCodexModels,
   grok: fetchGrokModels,
   cursor: fetchCursorModels,
+  agy: fetchAgyModels,
 };
 
 export interface ModelCatalogue {
