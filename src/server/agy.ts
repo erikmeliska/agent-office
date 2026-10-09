@@ -8,7 +8,7 @@
 // and comes out again when it ends. agy only loads a folder's hooks when that folder was already
 // trusted as it started: the first run in a folder it asks to trust reports nothing until it's
 // resumed, and its screen is read instead (see agyScreen).
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { excludeFromGit } from './config.js';
 
@@ -90,8 +90,21 @@ function hooksPath(cwd: string): string {
   return path.join(cwd, '.agents', 'hooks.json');
 }
 
-/** The folder's hooks.json as it is, 'none' when there isn't one, or undefined for one the office can't read (it's left alone). */
+/** Whether `p` is a symbolic link: a repository can check one in where .agents or its hooks.json goes, to point the office's write elsewhere. */
+function isLink(p: string): boolean {
+  try {
+    return lstatSync(p).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The folder's hooks.json as it is, 'none' when there isn't one, or undefined for one the office
+ * can't read or won't write through (a symlink, or one under a symlinked .agents): it's left alone.
+ */
 function readHooks(file: string): { config: Record<string, unknown>; text: string } | 'none' | undefined {
+  if (isLink(path.dirname(file)) || isLink(file)) return undefined;
   if (!existsSync(file)) return 'none';
   try {
     const text = readFileSync(file, 'utf8');

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { execFileSync, spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -322,4 +322,23 @@ test('helper forwards only the bounded fields, for its own worker, and always an
   // Someone's agy outside the office: nothing to report to.
   const outside = await runHelper(t, ['Stop', 'w1'], { AGENT_OFFICE_HOOK_URL: '' }, { conversationId: 'conv-9' });
   assert.equal(outside.stdout, '{}');
+});
+
+test('a symlinked .agents or hooks.json is never written through', (t) => {
+  const dir = scratch(t);
+  const hook = writeAgyHook(path.join(dir, 'data'));
+  const elsewhere = path.join(dir, 'elsewhere');
+  mkdirSync(elsewhere);
+  const target = path.join(elsewhere, 'hooks.json');
+  writeFileSync(target, '{}\n');
+  const linkedDir = path.join(dir, 'a');
+  mkdirSync(linkedDir);
+  symlinkSync(elsewhere, path.join(linkedDir, '.agents'));
+  assert.equal(addAgyHooks(linkedDir, hook, 'abc123'), false);
+  const linkedFile = path.join(dir, 'b');
+  mkdirSync(path.join(linkedFile, '.agents'), { recursive: true });
+  symlinkSync(target, hooksFile(linkedFile));
+  assert.equal(addAgyHooks(linkedFile, hook, 'abc123'), false);
+  removeAgyHooks(linkedFile, 'abc123');
+  assert.equal(readFileSync(target, 'utf8'), '{}\n');
 });
