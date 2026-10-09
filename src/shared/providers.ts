@@ -4,7 +4,7 @@
 //
 // Browser-safe: no node imports, the hire dialog reads this too.
 
-export const AGENT_PROVIDERS = ['claude', 'opencode', 'codex', 'grok', 'muse', 'dsh', 'pi', 'cursor', 'custom'] as const;
+export const AGENT_PROVIDERS = ['claude', 'opencode', 'codex', 'grok', 'muse', 'dsh', 'pi', 'cursor', 'agy', 'custom'] as const;
 
 export type AgentProvider = (typeof AGENT_PROVIDERS)[number];
 
@@ -59,6 +59,7 @@ export const MUSE_MODEL_MAX = 128;
 export const PI_MODEL_MAX = 256;
 export const CURSOR_MODEL_MAX = 128;
 export const CODEX_MODEL_MAX = 128;
+export const AGY_MODEL_MAX = 128;
 
 /**
  * DeepSeek Harness model ids are opaque option ids from its live catalog (the `session/new`
@@ -115,6 +116,29 @@ export function isValidPiModel(value: unknown): value is string {
 export function isValidCursorModel(value: unknown): value is string {
   return typeof value === 'string' && value.length <= CURSOR_MODEL_MAX && /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9._-]+=[A-Za-z0-9._-]+(?:,[A-Za-z0-9._-]+=[A-Za-z0-9._-]+)*\])?$/.test(value);
 }
+
+/** Antigravity model ids are argv values (`gemini-3.8-flash-high`), so only the characters a model id uses get through, and never a leading '-'. */
+export function isValidAgyModel(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= AGY_MODEL_MAX && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value);
+}
+
+/**
+ * The models `agy models` listed when the office learned it (agy 1.3.2), for the hire dialog when it
+ * can't be asked: an id names its family and its thinking level both.
+ */
+export const AGY_MODELS: readonly ModelOption[] = [
+  { id: 'gemini-3.8-flash-high', name: 'Gemini 3.8 Flash (High)' },
+  { id: 'gemini-3.8-flash-medium', name: 'Gemini 3.8 Flash (Medium)' },
+  { id: 'gemini-3.8-flash-low', name: 'Gemini 3.8 Flash (Low)' },
+  { id: 'gemini-3.7-flash-high', name: 'Gemini 3.7 Flash (High)' },
+  { id: 'gemini-3.7-flash-medium', name: 'Gemini 3.7 Flash (Medium)' },
+  { id: 'gemini-3.7-flash-low', name: 'Gemini 3.7 Flash (Low)' },
+  { id: 'gemini-3.1-pro-high', name: 'Gemini 3.1 Pro (High)' },
+  { id: 'gemini-3.1-pro-low', name: 'Gemini 3.1 Pro (Low)' },
+  { id: 'claude-opus-5-5-high', name: 'Claude Opus 5.5 (High)' },
+  { id: 'claude-sonnet-5-5-high', name: 'Claude Sonnet 5.5 (High)' },
+  { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+];
 
 /** DSH catalog ids are opaque, so only their length and control characters can be checked here. */
 export function isValidDshModel(value: unknown): value is string {
@@ -319,6 +343,23 @@ export const PROVIDER_META: Record<AgentProvider, ProviderMeta> = {
       invalid: 'Use a Cursor model id: letters, digits and . _ -, with any overrides in brackets, like model[effort=high] (up to 128 characters).',
     },
     usage: { note: 'Cursor uses the Cursor CLI login on the office machine. Usage and cost stay in its terminal and your Cursor account; the office does not meter them.' },
+  },
+  agy: {
+    label: 'Antigravity',
+    name: 'Antigravity',
+    bin: 'agy',
+    validModel: isValidAgyModel,
+    invalidModel: 'Invalid Antigravity model (expected a model id such as gemini-3.8-flash-high)',
+    models: {
+      pick: 'list',
+      catalog: true,
+      unset: 'Default (Antigravity settings)',
+      max: AGY_MODEL_MAX,
+      hint: 'Optional model, as agy models lists them, and effort for this worker.',
+      invalid: 'Use an Antigravity model id: letters, digits and . _ - (up to 128 characters).',
+    },
+    takesEffort: true,
+    usage: { note: 'Antigravity uses the agy login on the office machine. Usage and quota stay in its terminal (/usage); the office does not meter them.' },
   },
   custom: {
     label: 'Custom',
