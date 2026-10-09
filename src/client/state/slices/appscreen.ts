@@ -11,18 +11,21 @@ declare module '../store' {
   }
 }
 
+/** No pages: before the office says, or from an office that has no screen (one older than this page). */
+const NO_SCREEN: AppScreenState = { pages: [], rotate: 0 };
+
 export const appScreen: Slice = {
   init(s) {
-    s.appScreen = { pages: [], rotate: 0 };
+    s.appScreen = NO_SCREEN;
   },
   on: {
     appScreen(s, m) {
-      s.appScreen = m.state;
+      s.appScreen = m.state ?? NO_SCREEN;
       return ['appScreen'];
     },
   },
   enter(s, v) {
-    s.appScreen = v.appScreen;
+    s.appScreen = v.appScreen ?? NO_SCREEN;
     return ['appScreen'];
   },
 };
